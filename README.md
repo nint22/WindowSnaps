@@ -1,7 +1,7 @@
 WindowSnaps
 ===========
 
-[[Logo.png]] [[BeforeAfter.png]]
+[WindowSnaps Logo](Logo.png) [Before and after snapping](BeforeAfter.png)
 
 A simple OSX addon that will "snap" windows you drag to the left or right screen edge, much like in the Windows desktop environments. The logo is tacky, but this is a pretty helpful utility.
 
