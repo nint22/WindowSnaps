@@ -14,6 +14,10 @@
     // Based on http://cocoatutorial.grapewave.com/2010/01/creating-a-status-bar-application/
     IBOutlet NSMenu* statusMenu;
     NSStatusItem* statusItem;
+    
+    // A list of all PIDs we are tracking; this changes over time based on new processes
+    // or killed processes
+    NSMutableSet* TrackedProcesses;
 }
 
 @end

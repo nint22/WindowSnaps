@@ -17,6 +17,7 @@
 		0699E6AA16A6385000D9DEBF /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 0699E6A916A6385000D9DEBF /* AppDelegate.m */; };
 		0699E6AD16A6385000D9DEBF /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 0699E6AB16A6385000D9DEBF /* MainMenu.xib */; };
 		0699E6B416A7B07900D9DEBF /* MainIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 0699E6B316A7B07900D9DEBF /* MainIcon.png */; };
+		06C4A68716AA06F900A63589 /* MainIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 06C4A68616AA06F900A63589 /* MainIcon.icns */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +39,7 @@
 		0699E6A916A6385000D9DEBF /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
 		0699E6AC16A6385000D9DEBF /* en */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = en; path = en.lproj/MainMenu.xib; sourceTree = "<group>"; };
 		0699E6B316A7B07900D9DEBF /* MainIcon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = MainIcon.png; sourceTree = "<group>"; };
+		06C4A68616AA06F900A63589 /* MainIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = MainIcon.icns; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -113,6 +115,7 @@
 		0699E69D16A6385000D9DEBF /* Supporting Files */ = {
 			isa = PBXGroup;
 			children = (
+				06C4A68616AA06F900A63589 /* MainIcon.icns */,
 				067094B216A8D97F0019E508 /* LogoSmall.png */,
 				0699E6B316A7B07900D9DEBF /* MainIcon.png */,
 				0699E69E16A6385000D9DEBF /* WindowSnaps-Info.plist */,
@@ -181,6 +184,7 @@
 				0699E6B416A7B07900D9DEBF /* MainIcon.png in Resources */,
 				067094AF16A8D8EB0019E508 /* InfoPopup.xib in Resources */,
 				067094B316A8D97F0019E508 /* LogoSmall.png in Resources */,
+				06C4A68716AA06F900A63589 /* MainIcon.icns in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -277,6 +281,7 @@
 		0699E6B116A6385000D9DEBF /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_ARC = NO;
 				COMBINE_HIDPI_IMAGES = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "WindowSnaps/WindowSnaps-Prefix.pch";
@@ -289,6 +294,7 @@
 		0699E6B216A6385000D9DEBF /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_ARC = NO;
 				COMBINE_HIDPI_IMAGES = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "WindowSnaps/WindowSnaps-Prefix.pch";

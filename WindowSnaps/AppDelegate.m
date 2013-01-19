@@ -13,12 +13,20 @@
 #import <Carbon/Carbon.h>
 #import "InfoPopup.h"
 
-// Static callback for when a window is moved around
-// When this was moved (i.e. the user releases the mouse) we need to check for input and change window size if necesary
-void MyAXObserverCallback(AXObserverRef observer, AXUIElementRef element, CFStringRef notificationName, void* contextData)
+// The top and side buffer size (based in pixels)
+static const int SideBufferWidth = 5;
+static const int TopBufferHeight = 10;
+
+// The latest element that has been moved by the user; this is what we will use when we see a left-click release
+static __strong AXUIElementRef LatestElement = NULL;
+
+// The press down and move 
+
+// Static callback for when a user releases the mouse button
+CGEventRef MyCGEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon)
 {
     // Get global mouse position
-    NSPoint MousePos = [NSEvent mouseLocation];
+    CGPoint MousePos = CGEventGetLocation(event);
     
     // True if we should snap, and with what origin & size
     bool WillSnap = false;
@@ -36,7 +44,7 @@ void MyAXObserverCallback(AXObserverRef observer, AXUIElementRef element, CFStri
         
         // Did the user attempt to snap-left?
         int LeftDx = ScreenRect.origin.x - MousePos.x;
-        if(LeftDx >= 0 && LeftDx < 5) // 5 pixel buffer
+        if(LeftDx >= 0 && LeftDx < SideBufferWidth)
         {
             // Window snapping to left!
             WillSnap = true;
@@ -45,8 +53,8 @@ void MyAXObserverCallback(AXObserverRef observer, AXUIElementRef element, CFStri
         }
         
         // Did the user attempt to snap-right?
-        int RightDx = (ScreenRect.origin.x + ScreenRect.size.width) - MousePos.x;
-        if(RightDx <= 0 && RightDx > -5) // 5 pixel buffer
+        int RightDx = ScreenRect.size.width - MousePos.x;
+        if(RightDx >= 0 && RightDx < SideBufferWidth)
         {
             // Window snapping to right!
             WillSnap = true;
@@ -54,9 +62,9 @@ void MyAXObserverCallback(AXObserverRef observer, AXUIElementRef element, CFStri
             break;
         }
         
-        // Did the user attempt to snap to the top? (cursor moved up and the x is in the top 
-        int TopDy = (ScreenRect.origin.y + ScreenRect.size.height) - MousePos.y;
-        if(TopDy < 30) // 5 pixel buffer
+        // Did the user attempt to snap to the top? (cursor moved up and the x is in the top
+        int TopDy = MousePos.y;
+        if(TopDy < (TopBufferHeight + [[[NSApplication sharedApplication] mainMenu] menuBarHeight]))
         {
             // Window snapping to right!
             WillSnap = true;
@@ -66,14 +74,39 @@ void MyAXObserverCallback(AXObserverRef observer, AXUIElementRef element, CFStri
     }
     
     // Snap if needed
-    if(WillSnap)
+    if(WillSnap && LatestElement != NULL)
     {
         AXValueRef NewOrigin = AXValueCreate(kAXValueCGPointType, &(SnapRect.origin));
-        AXUIElementSetAttributeValue(element, kAXPositionAttribute, NewOrigin);
+        AXUIElementSetAttributeValue(LatestElement, kAXPositionAttribute, NewOrigin);
         
         AXValueRef NewSize = AXValueCreate(kAXValueCGSizeType, &(SnapRect.size));
-        AXUIElementSetAttributeValue(element, kAXSizeAttribute, NewSize);
+        AXUIElementSetAttributeValue(LatestElement, kAXSizeAttribute, NewSize);
     }
+    
+    // Always release the latest element
+    LatestElement = NULL;
+    
+    // Nothing else to do - return raw data (not that it matters; we tell the system we're just reading data)
+    return event;
+}
+
+// Static callback for when a window is moved around
+// When this was moved (i.e. the user releases the mouse) we need to check for input and change window size if necesary
+void AXMCallback(AXObserverRef observer, AXUIElementRef element, CFStringRef notificationName, void* contextData)
+{
+    // Element was created
+	if(CFStringCompare(notificationName, kAXWindowCreatedNotification, 0) == 0)
+	{
+        // Nothing to do here; registration is done through the update loop
+	}
+    
+    // Element was moved
+	else if(CFStringCompare(notificationName, kAXWindowMovedNotification, 0) == 0)
+	{
+        // Retain the element manipulated in question. Technical issue, resolved through:
+        // http://stackoverflow.com/questions/853833/how-can-my-app-detect-a-change-to-another-apps-window
+        LatestElement = (AXUIElementRef)CFMakeCollectable(CFRetain(element));
+	}
 }
 
 @implementation AppDelegate
@@ -82,13 +115,15 @@ void MyAXObserverCallback(AXObserverRef observer, AXUIElementRef element, CFStri
 
 - (void)dealloc
 {
+    [statusItem release];
+    [TrackedProcesses release];
+    
     [super dealloc];
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification
 {
 }
-
 
 -(void)awakeFromNib
 {
@@ -98,7 +133,7 @@ void MyAXObserverCallback(AXObserverRef observer, AXUIElementRef element, CFStri
 -(void)InfoPressed
 {
     // Instance our info window
-    InfoPopup* Popup = [[InfoPopup alloc] initWithWindowNibName:@"InfoPopup"];
+    InfoPopup* Popup = [[[InfoPopup alloc] initWithWindowNibName:@"InfoPopup"] autorelease];
     [NSApp runModalForWindow: [Popup window]];
 }
 
@@ -138,30 +173,41 @@ void MyAXObserverCallback(AXObserverRef observer, AXUIElementRef element, CFStri
     if(!IsAuthorized)
     {
         // Present and wait
-        NSAlert* Popup = [NSAlert alertWithMessageText:@"Error: Accessibility not enabled" defaultButton:@"Quit Application" alternateButton:nil otherButton:nil informativeTextWithFormat:@"This application requires system-accessibility authorization. To do this, go to System Preferences, Universal Access, and make sure that \"Enable access for assistive devices\" is enabled."];
-        [Popup runModal];
+        NSAlert* PopupAlert = [NSAlert alertWithMessageText:@"Error: Accessibility not enabled" defaultButton:@"Quit Application" alternateButton:nil otherButton:nil informativeTextWithFormat:@"This application requires system-accessibility authorization. To do this, go to System Preferences, Universal Access, and make sure that \"Enable access for assistive devices\" is enabled."];
+        [PopupAlert runModal];
         
         // Simply force-quit!
         exit(0);
     }
     
-    // Single-step update for the sake of testing
-    // TODO: Instead of a constant query, let's ask the OS to get informed on every new app launch
+    // Install the mouse release event
+    CFMachPortRef MouseUpEventHandle = CGEventTapCreate(kCGSessionEventTap, kCGHeadInsertEventTap, kCGEventTapOptionListenOnly, 1 << kCGEventLeftMouseUp, MyCGEventCallback, @"");
+    CFRunLoopSourceRef RunSourceLoop = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, MouseUpEventHandle, 0);
+    
+    // Attatch to run-time detection
+    CFRunLoopAddSource(CFRunLoopGetCurrent(), RunSourceLoop, kCFRunLoopCommonModes);
+    CGEventTapEnable(MouseUpEventHandle, true);
+    
+    // Initialize an empty window registration array
+    TrackedProcesses = [[NSMutableSet alloc] init];
+    
+    // Launch the window registration code, etc.
     // By doing this, we can then use the current code to explicitly ask for any new window launches
-    [NSTimer scheduledTimerWithTimeInterval:1.0f target:self selector:@selector(CheckSnaps) userInfo:nil repeats:true];
+    [NSTimer scheduledTimerWithTimeInterval:2.0f target:self selector:@selector(UpdateAppHandles) userInfo:nil repeats:true];
 }
 
-- (void)CheckSnaps
+- (void)UpdateAppHandles
 {
     // Get all windows listed
     // Returns an array of CGWindowID types
     CFArrayRef WindowList = CGWindowListCreate(kCGWindowListOptionOnScreenOnly, kCGNullWindowID);
     
+    // New process list
+    NSMutableSet* NewProcessIDs = [[NSMutableSet alloc] init];
+    
     // Get description information for each window we found above
     // Returns an array of (possibly matchin) window description stuff...
     CFArrayRef DescriptionList = CGWindowListCreateDescriptionFromArray(WindowList);
-    
-    // For each graphical app (has a root window and more windows...)
     for(int i = 0; i < CFArrayGetCount(DescriptionList); i++)
     {
         // Pull out window description
@@ -172,42 +218,40 @@ void MyAXObserverCallback(AXObserverRef observer, AXUIElementRef element, CFStri
         int64_t PIDBuffer;
         CFNumberGetValue(AppPID, kCFNumberSInt64Type, &PIDBuffer);
         
-        // Convert from 64 bit to actual PID type
-        pid_t PID = (pid_t)PIDBuffer; // Isn't PID a hidden type / structure? i.e. it is unsafe to do this...
+        // Add to new process list
+        [NewProcessIDs addObject:[NSNumber numberWithLongLong:PIDBuffer]];
+    }
+    CFRelease(DescriptionList);
+    
+    // Remove processes that have already been used
+    NSMutableSet* ActiveSet = [NewProcessIDs copy];
+    [NewProcessIDs minusSet:TrackedProcesses];
+    
+    // We essentially just want to retain the new process list (if a process is unlisted, that's new to us!)
+    TrackedProcesses = ActiveSet;
+    
+    // For each graphical app (has a root window and more windows...)
+    for(NSNumber* PIDNumber in NewProcessIDs)
+    {
+        // Get the PID value out
+        pid_t PID = (pid_t)[PIDNumber longLongValue];
         
         // Get the app's base window controller
-        AXUIElementRef ApplicationHandle = AXUIElementCreateApplication(PID);
+        AXUIElementRef WindowHandle = AXUIElementCreateApplication(PID);
         
-        // Get active windows of this app
-        CFArrayRef ApplicationWindowsList = NULL;
-        AXUIElementCopyAttributeValue(ApplicationHandle, kAXWindowsAttribute, (CFTypeRef*)&ApplicationWindowsList);
+        // Create window events observer
+        __strong AXObserverRef ObserverHandle = NULL;
+        AXObserverCreate(PID, AXMCallback, &ObserverHandle);
         
-        // If there are any windows...
-        if(ApplicationWindowsList != NULL && CFArrayGetCount(ApplicationWindowsList) > 0)
-        {
-            // For each window..
-            for(int j = 0; j < CFArrayGetCount(ApplicationWindowsList); j++)
-            {
-                // Get the window handle...
-                __strong AXUIElementRef WindowHandle = CFArrayGetValueAtIndex(ApplicationWindowsList, j);
-                
-                // Documentation: http://stackoverflow.com/questions/853833/how-can-my-app-detect-a-change-to-another-apps-window
-                
-                // Create observer
-                AXObserverRef ObserverHandle = NULL;
-                AXObserverCreate(PID, MyAXObserverCallback, &ObserverHandle);
-                
-                // Attach observer to window in question (remove any we currently have)
-                if(AXObserverAddNotification(ObserverHandle, WindowHandle, kAXWindowMovedNotification, (void*)self) == kAXErrorSuccess)
-                {
-                    // Now make async to not freeze up any other mechanisms
-                    CFRunLoopAddSource([[NSRunLoop currentRunLoop] getCFRunLoop], AXObserverGetRunLoopSource(ObserverHandle), kCFRunLoopDefaultMode);
-                }
-            }
-        }
+        // Create new window movement handle..
+        if(AXObserverAddNotification(ObserverHandle, WindowHandle, kAXWindowCreatedNotification, (void*)self) == kAXErrorSuccess &&
+           AXObserverAddNotification(ObserverHandle, WindowHandle, kAXWindowMovedNotification, (void*)self) == kAXErrorSuccess)
+            CFRunLoopAddSource([[NSRunLoop currentRunLoop] getCFRunLoop], AXObserverGetRunLoopSource(ObserverHandle), kCFRunLoopDefaultMode);
     }
     
     // Done installing all handles
+    CFRelease(WindowList);
+    CFRelease(NewProcessIDs);
 }
 
 // Authorization check of Accessibility API
